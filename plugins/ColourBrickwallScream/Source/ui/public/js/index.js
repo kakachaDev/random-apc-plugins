@@ -124,19 +124,16 @@ function drawKnob (canvas, norm) {
 // ═══════════════════════════════════════════════════════
 
 const FMT = {
-  'drive':             n => (n * 40).toFixed(1) + ' dB',
-  'tone':              n => { const v = n*2-1; return (v>=0?'+':'')+v.toFixed(2); },
-  'colour':            n => Math.round(n * 100) + '%',
-  'attack_character':  n => { const ms = Math.exp(Math.log(0.1) + n * Math.log(500)); return ms.toFixed(1) + ' ms'; },
-  'ceiling':           n => (-12 + n*12).toFixed(1) + ' dBFS',
-  'mix':               n => Math.round(n * 100) + '%',
-  'output_gain':       n => { const v = -12 + n*24; return (v>=0?'+':'')+v.toFixed(1)+' dB'; },
+  'drive':   n => (n * 40).toFixed(1) + ' dB',
+  'tone':    n => { const v = n*2-1; return (v>=0?'+':'')+v.toFixed(2); },
+  'colour':  n => Math.round(n * 100) + '%',
+  'ceiling': n => (-12 + n*12).toFixed(1) + ' dBFS',
+  'mix':     n => Math.round(n * 100) + '%',
 };
 
 const VALUE_ID = {
   'drive': 'v-drive', 'tone': 'v-tone', 'colour': 'v-colour',
-  'attack_character': 'v-attack', 'ceiling': 'v-ceiling',
-  'mix': 'v-mix', 'output_gain': 'v-output',
+  'ceiling': 'v-ceiling', 'mix': 'v-mix',
 };
 
 // ═══════════════════════════════════════════════════════
@@ -148,8 +145,7 @@ const knobMap     = {};   // paramId → canvas element
 
 function initJuceParams () {
   const paramIds = [
-    'drive', 'character', 'tone', 'colour',
-    'attack_character', 'ceiling', 'mix', 'output_gain'
+    'drive', 'character', 'tone', 'colour', 'ceiling', 'mix'
   ];
 
   paramIds.forEach (id => {

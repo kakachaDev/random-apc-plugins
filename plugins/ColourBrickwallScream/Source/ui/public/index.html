@@ -265,7 +265,7 @@ canvas.knob { display: block; cursor: ns-resize; }
       <canvas class="knob" id="k-drive" width="180" height="180"
         data-param="drive" data-norm="0.25"
         data-min="0" data-max="1" data-default="0.25" data-bipolar="0"></canvas>
-      <div class="knob-label" style="font-size:10px;letter-spacing:3px;">Drive / Scream</div>
+      <div class="knob-label" style="font-size:10px;letter-spacing:3px;">Drive</div>
       <div class="knob-value" id="v-drive">10.0 dB</div>
       <div id="char-sel">
         <button class="char-btn active" data-char="0">TUBE</button>
@@ -291,13 +291,6 @@ canvas.knob { display: block; cursor: ns-resize; }
   <!-- BOTTOM ROW -->
   <div id="bottom-row">
     <div class="small-section">
-      <canvas class="knob" id="k-attack" width="80" height="80"
-        data-param="attack_character" data-norm="0.5"
-        data-min="0" data-max="1" data-default="0.5" data-bipolar="0"></canvas>
-      <div class="knob-label">Attack</div>
-      <div class="knob-value" id="v-attack">4.9 ms</div>
-    </div>
-    <div class="small-section">
       <canvas class="knob" id="k-ceiling" width="80" height="80"
         data-param="ceiling" data-norm="0.975"
         data-min="-12" data-max="0" data-default="-0.3" data-bipolar="0"></canvas>
@@ -310,13 +303,6 @@ canvas.knob { display: block; cursor: ns-resize; }
         data-min="0" data-max="1" data-default="1" data-bipolar="0"></canvas>
       <div class="knob-label">Mix</div>
       <div class="knob-value" id="v-mix">100%</div>
-    </div>
-    <div class="small-section">
-      <canvas class="knob" id="k-output" width="80" height="80"
-        data-param="output_gain" data-norm="0.5"
-        data-min="-12" data-max="12" data-default="0" data-bipolar="1"></canvas>
-      <div class="knob-label">Output</div>
-      <div class="knob-value" id="v-output">0.0 dB</div>
     </div>
   </div>
 

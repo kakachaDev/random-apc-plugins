@@ -30,10 +30,8 @@ ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEd
             .withOptionsFrom (characterRelay)
             .withOptionsFrom (colourRelay)
             .withOptionsFrom (toneRelay)
-            .withOptionsFrom (attackCharacterRelay)
             .withOptionsFrom (ceilingRelay)
             .withOptionsFrom (mixRelay)
-            .withOptionsFrom (outputGainRelay)
             .withResourceProvider ([this] (const auto& url) {
                 return getResource (url);
             })
@@ -43,14 +41,12 @@ ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEd
 
     // ── Create parameter attachments AFTER webView ────────────────────────────
     auto& apvts = audioProcessor.apvts;
-    driveAttachment           = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::DRIVE),            driveRelay,           nullptr);
-    characterAttachment       = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::CHARACTER),        characterRelay,       nullptr);
-    colourAttachment          = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::COLOUR),           colourRelay,          nullptr);
-    toneAttachment            = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::TONE),             toneRelay,            nullptr);
-    attackCharacterAttachment = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::ATTACK_CHARACTER), attackCharacterRelay, nullptr);
-    ceilingAttachment         = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::CEILING),          ceilingRelay,         nullptr);
-    mixAttachment             = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::MIX),              mixRelay,             nullptr);
-    outputGainAttachment      = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::OUTPUT_GAIN),      outputGainRelay,      nullptr);
+    driveAttachment     = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::DRIVE),     driveRelay,     nullptr);
+    characterAttachment = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::CHARACTER), characterRelay, nullptr);
+    colourAttachment    = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::COLOUR),    colourRelay,    nullptr);
+    toneAttachment      = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::TONE),      toneRelay,      nullptr);
+    ceilingAttachment   = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::CEILING),   ceilingRelay,   nullptr);
+    mixAttachment       = std::make_unique<juce::WebSliderParameterAttachment> (*apvts.getParameter (ParameterIDs::MIX),       mixRelay,       nullptr);
 
     // ── Load web content ───────────────────────────────────────────────────────
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());

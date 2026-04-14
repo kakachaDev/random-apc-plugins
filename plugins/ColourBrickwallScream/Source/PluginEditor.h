@@ -32,14 +32,12 @@ private:
     // ═══════════════════════════════════════════════════════════════════════════
     // 1. RELAYS FIRST (destroyed last — no dependencies)
     // ═══════════════════════════════════════════════════════════════════════════
-    juce::WebSliderRelay driveRelay            { ParameterIDs::DRIVE            };
-    juce::WebSliderRelay characterRelay        { ParameterIDs::CHARACTER        };
-    juce::WebSliderRelay colourRelay           { ParameterIDs::COLOUR           };
-    juce::WebSliderRelay toneRelay             { ParameterIDs::TONE             };
-    juce::WebSliderRelay attackCharacterRelay  { ParameterIDs::ATTACK_CHARACTER };
-    juce::WebSliderRelay ceilingRelay          { ParameterIDs::CEILING          };
-    juce::WebSliderRelay mixRelay              { ParameterIDs::MIX              };
-    juce::WebSliderRelay outputGainRelay       { ParameterIDs::OUTPUT_GAIN      };
+    juce::WebSliderRelay driveRelay     { ParameterIDs::DRIVE     };
+    juce::WebSliderRelay characterRelay { ParameterIDs::CHARACTER };
+    juce::WebSliderRelay colourRelay    { ParameterIDs::COLOUR    };
+    juce::WebSliderRelay toneRelay      { ParameterIDs::TONE      };
+    juce::WebSliderRelay ceilingRelay   { ParameterIDs::CEILING   };
+    juce::WebSliderRelay mixRelay       { ParameterIDs::MIX       };
 
     // ═══════════════════════════════════════════════════════════════════════════
     // 2. WEBVIEW SECOND (destroyed middle — references relays)
@@ -53,10 +51,8 @@ private:
     std::unique_ptr<juce::WebSliderParameterAttachment> characterAttachment;
     std::unique_ptr<juce::WebSliderParameterAttachment> colourAttachment;
     std::unique_ptr<juce::WebSliderParameterAttachment> toneAttachment;
-    std::unique_ptr<juce::WebSliderParameterAttachment> attackCharacterAttachment;
     std::unique_ptr<juce::WebSliderParameterAttachment> ceilingAttachment;
     std::unique_ptr<juce::WebSliderParameterAttachment> mixAttachment;
-    std::unique_ptr<juce::WebSliderParameterAttachment> outputGainAttachment;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Resource provider

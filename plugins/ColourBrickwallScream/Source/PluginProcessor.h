@@ -13,7 +13,7 @@
  *
  * Signal chain:
  *   DryBuffer tap → DriveGain → Saturation (Temper) → Colour → Tone →
- *   Brickwall Limiter → OutputGain → MixBlend → Output
+ *   Brickwall Limiter → MixBlend → Output
  */
 class ColourBrickwallScreamAudioProcessor : public juce::AudioProcessor
 {
@@ -65,10 +65,6 @@ public:
     std::atomic<float> meterGR     { 0.0f };   // 0.0–1.0 (0=no reduction, 1=full)
     std::atomic<float> meterOutput { 0.0f };   // 0.0–1.0 linear
 
-    //==============================================================================
-    // Latency (lookahead)
-    int getLatencySamples() const { return lookaheadSamples; }
-
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -80,20 +76,15 @@ private:
     int    blockSize_   = 512;
     int    numChannels_ = 2;
 
-    // Lookahead (2ms, scaled to sample rate)
-    int lookaheadSamples = 0;
-
     // ── DRIVE ─────────────────────────────────────────────────────────────────────
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDrive;
 
     // ── SATURATION (Temper) ───────────────────────────────────────────────────────
-    // Per-sample transfer function selection
     int   currentChar  = 0;
     int   targetChar   = 0;
-    float crossfadePos = 1.0f;   // 1.0 = fully on targetChar
-    float crossfadeInc = 0.0f;   // per-sample increment for 4ms fade
+    float crossfadePos = 1.0f;
+    float crossfadeInc = 0.0f;
 
-    // Inline transfer functions
     static float saturateTube       (float x, float drive) noexcept;
     static float saturateTape       (float x, float drive) noexcept;
     static float saturateTransformer(float x, float drive) noexcept;
@@ -101,15 +92,13 @@ private:
     static float saturateBitcrush   (float x, float drive) noexcept;
     static float saturateFullScream (float x, float drive) noexcept;
 
-    // Tape: post-saturation LPF per channel (1 pole, 14kHz)
+    // Tape: post-saturation LPF per channel (1-pole, ~14kHz)
     std::array<float, 2> tapeLPFState { 0.0f, 0.0f };
-    float tapeLPFCoeff = 0.0f;   // updated in prepareToPlay
+    float tapeLPFCoeff = 0.0f;
 
-    // Bitcrush: bit-depth mapped from drive
     static float getBitDepthFromDrive (float normDrive) noexcept;
 
     // ── COLOUR ────────────────────────────────────────────────────────────────────
-    // Per-variant biquad (one filter pair per channel, 2 channels max)
     using BiquadCoeffs = juce::dsp::IIR::Coefficients<float>;
 
     struct ColourFilter
@@ -121,44 +110,27 @@ private:
         void setCoeffs (BiquadCoeffs::Ptr c);
     };
 
-    std::array<ColourFilter, 6> colourFilters;   // one per Temper variant
+    std::array<ColourFilter, 6> colourFilters;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothColour;
-
     void updateColourFilter (int variant, double sr);
 
-    // ── TONE (tilt EQ) ────────────────────────────────────────────────────────────
-    juce::dsp::IIR::Filter<float> toneFilter[2];  // per channel
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothTone;
-    float lastToneValue = 2.0f;  // sentinel to force first recalculation
+    // ── TONE (dual-shelf tilt EQ) ─────────────────────────────────────────────────
+    juce::dsp::IIR::Filter<float> toneFilterHigh[2];  // high shelf per channel
+    juce::dsp::IIR::Filter<float> toneFilterLow[2];   // low shelf per channel
+    float lastToneValue = 2.0f;   // sentinel to force first recalculation
     void updateToneFilter (float toneValue, double sr);
 
     // ── BRICKWALL LIMITER ──────────────────────────────────────────────────────────
-    // Lookahead ring buffer (per channel)
-    juce::AudioBuffer<float> lookaheadBuf;
-    int lookaheadWritePos = 0;
-
-    // Gain reduction envelope (single value, applied to all channels)
-    float grEnvelope = 1.0f;    // 1.0 = no reduction
-    float attackCoeff  = 0.0f;  // per-sample, updated from attack_character
-    float releaseCoeff = 0.0f;  // fixed 200ms
-
-    // 4x oversampling for true-peak detection
-    juce::dsp::Oversampling<float> oversampler;
-
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothAttack;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothCeiling;
-
-    void updateLimiterCoeffs (float attackNorm, float ceilingDb, double sr);
+    float grEnvelope   = 1.0f;
+    float attackCoeff  = 0.0f;   // fixed 0.5ms, set in prepareToPlay
+    float releaseCoeff = 0.0f;   // fixed 200ms
 
     // GR meter (smoothed, for atomic write)
     float grMeterSmoothed = 0.0f;
 
     // ── DRY BUFFER & MIX ──────────────────────────────────────────────────────────
-    juce::AudioBuffer<float> dryBuffer;   // latency-compensated dry signal
-    int dryWritePos = 0;
-
+    juce::AudioBuffer<float> dryBuffer;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothMix;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothOutputGain;
 
     // ── METERING ─────────────────────────────────────────────────────────────────
     float meterInSmoothed  = 0.0f;

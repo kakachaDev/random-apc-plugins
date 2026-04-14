@@ -12,29 +12,24 @@ ColourBrickwallScreamAudioProcessor::createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    // Drive/Scream: 0.0–1.0 (mapped to 0–40dB in processor)
+    // Drive: 0.0–1.0 (mapped to 0–40dB in processor)
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        ParameterIDs::DRIVE, "Drive / Scream",
+        ParameterIDs::DRIVE, "Drive",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.25f));
 
     // Character: 0–5 enum (Tube/Tape/Transformer/Diode/Bitcrush/Full Scream)
     layout.add (std::make_unique<juce::AudioParameterInt> (
         ParameterIDs::CHARACTER, "Character", 0, 5, 0));
 
-    // Tone: -1.0–1.0 (tilt EQ ±6dB)
+    // Tone: -1.0–1.0 (dual-shelf tilt EQ)
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         ParameterIDs::TONE, "Tone",
         juce::NormalisableRange<float> (-1.0f, 1.0f, 0.001f), 0.0f));
 
-    // Colour: 0.0–1.0 (per-variant harmonic blend)
+    // Colour: 0.0–1.0 (per-variant harmonic texture)
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         ParameterIDs::COLOUR, "Colour",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.0f));
-
-    // Attack Character: 0.0–1.0 (mapped log to 0.1ms–50ms)
-    layout.add (std::make_unique<juce::AudioParameterFloat> (
-        ParameterIDs::ATTACK_CHARACTER, "Attack Character",
-        juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 0.5f));
 
     // Ceiling: -12.0–0.0 dBFS
     layout.add (std::make_unique<juce::AudioParameterFloat> (
@@ -46,11 +41,6 @@ ColourBrickwallScreamAudioProcessor::createParameterLayout()
         ParameterIDs::MIX, "Mix",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f), 1.0f));
 
-    // Output Gain: -12.0–12.0 dB
-    layout.add (std::make_unique<juce::AudioParameterFloat> (
-        ParameterIDs::OUTPUT_GAIN, "Output Gain",
-        juce::NormalisableRange<float> (-12.0f, 12.0f, 0.01f), 0.0f));
-
     return layout;
 }
 
@@ -61,8 +51,7 @@ ColourBrickwallScreamAudioProcessor::ColourBrickwallScreamAudioProcessor()
     : AudioProcessor (BusesProperties()
           .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "ColourBrickwallScream", createParameterLayout()),
-      oversampler (2, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true)
+      apvts (*this, nullptr, "ColourBrickwallScream", createParameterLayout())
 {
 }
 
@@ -79,21 +68,19 @@ void ColourBrickwallScreamAudioProcessor::prepareToPlay (double sampleRate, int 
     blockSize_   = samplesPerBlock;
     numChannels_ = std::min (getTotalNumOutputChannels(), 2);
 
-    // Lookahead: 2ms
-    lookaheadSamples = static_cast<int> (std::ceil (0.002 * sampleRate));
-    setLatencySamples (lookaheadSamples);
+    setLatencySamples (0);
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
     spec.numChannels      = static_cast<juce::uint32> (numChannels_);
 
-    // ── Drive smoothing (20ms) ─────────────────────────────────────────────────
+    // ── Drive smoothing (20ms) ────────────────────────────────────────────────
     smoothDrive.reset (sampleRate, 0.020);
     smoothDrive.setCurrentAndTargetValue (
         apvts.getRawParameterValue (ParameterIDs::DRIVE)->load());
 
-    // ── Tape LPF (simple 1-pole, ~14kHz) ──────────────────────────────────────
+    // ── Tape LPF (1-pole, ~14kHz) ─────────────────────────────────────────────
     const double tapeCutoff = 14000.0;
     tapeLPFCoeff = static_cast<float> (
         std::exp (-2.0 * juce::MathConstants<double>::pi * tapeCutoff / sampleRate));
@@ -110,49 +97,28 @@ void ColourBrickwallScreamAudioProcessor::prepareToPlay (double sampleRate, int 
     smoothColour.setCurrentAndTargetValue (
         apvts.getRawParameterValue (ParameterIDs::COLOUR)->load());
 
-    // ── Tone filter ────────────────────────────────────────────────────────────
-    lastToneValue = 2.0f;  // force recalculation
+    // ── Tone filters ───────────────────────────────────────────────────────────
+    lastToneValue = 2.0f;   // force recalculation
     for (int ch = 0; ch < numChannels_; ++ch)
-        toneFilter[ch].reset();
-    smoothTone.reset (sampleRate, 0.020);
-    smoothTone.setCurrentAndTargetValue (
-        apvts.getRawParameterValue (ParameterIDs::TONE)->load());
+    {
+        toneFilterHigh[ch].reset();
+        toneFilterLow[ch].reset();
+    }
+    updateToneFilter (apvts.getRawParameterValue (ParameterIDs::TONE)->load(), sampleRate);
 
     // ── Brickwall limiter ──────────────────────────────────────────────────────
-    lookaheadBuf.setSize (numChannels_, lookaheadSamples + samplesPerBlock + 16);
-    lookaheadBuf.clear();
-    lookaheadWritePos = 0;
     grEnvelope = 1.0f;
-
-    oversampler.initProcessing (static_cast<size_t> (samplesPerBlock));
-    oversampler.reset();
-
-    smoothAttack.reset (sampleRate, 0.020);
-    smoothCeiling.reset (sampleRate, 0.050);
-    {
-        float atkNorm  = apvts.getRawParameterValue (ParameterIDs::ATTACK_CHARACTER)->load();
-        float ceilDb   = apvts.getRawParameterValue (ParameterIDs::CEILING)->load();
-        smoothAttack.setCurrentAndTargetValue (atkNorm);
-        smoothCeiling.setCurrentAndTargetValue (ceilDb);
-        updateLimiterCoeffs (atkNorm, ceilDb, sampleRate);
-    }
-    releaseCoeff = static_cast<float> (
-        std::exp (-1.0 / (0.200 * sampleRate)));  // 200ms fixed release
+    attackCoeff  = static_cast<float> (std::exp (-1.0 / (0.0005 * sampleRate)));  // 0.5ms
+    releaseCoeff = static_cast<float> (std::exp (-1.0 / (0.200  * sampleRate)));  // 200ms
 
     // ── Dry buffer ─────────────────────────────────────────────────────────────
-    dryBuffer.setSize (numChannels_, lookaheadSamples + samplesPerBlock + 16);
+    dryBuffer.setSize (numChannels_, samplesPerBlock);
     dryBuffer.clear();
-    dryWritePos = 0;
 
-    // ── Output / mix smoothing ──────────────────────────────────────────────────
+    // ── Mix smoothing ──────────────────────────────────────────────────────────
     smoothMix.reset (sampleRate, 0.020);
     smoothMix.setCurrentAndTargetValue (
         apvts.getRawParameterValue (ParameterIDs::MIX)->load());
-
-    smoothOutputGain.reset (sampleRate, 0.020);
-    smoothOutputGain.setCurrentAndTargetValue (
-        juce::Decibels::decibelsToGain (
-            apvts.getRawParameterValue (ParameterIDs::OUTPUT_GAIN)->load()));
 
     // ── Temper crossfade ───────────────────────────────────────────────────────
     currentChar  = static_cast<int> (apvts.getRawParameterValue (ParameterIDs::CHARACTER)->load());
@@ -160,11 +126,10 @@ void ColourBrickwallScreamAudioProcessor::prepareToPlay (double sampleRate, int 
     crossfadePos = 1.0f;
     crossfadeInc = 0.0f;
 
-    // Crossfade increment: full transition in 4ms
     const float crossfadeSamples = static_cast<float> (0.004 * sampleRate);
     crossfadeInc = (crossfadeSamples > 0.0f) ? (1.0f / crossfadeSamples) : 1.0f;
 
-    // ── Meter smoothing state ───────────────────────────────────────────────────
+    // ── Meter state ───────────────────────────────────────────────────────────
     meterInSmoothed  = 0.0f;
     meterOutSmoothed = 0.0f;
     grMeterSmoothed  = 0.0f;
@@ -172,61 +137,91 @@ void ColourBrickwallScreamAudioProcessor::prepareToPlay (double sampleRate, int 
 
 void ColourBrickwallScreamAudioProcessor::releaseResources()
 {
-    oversampler.reset();
 }
 
 //==============================================================================
 // SATURATION TRANSFER FUNCTIONS
+//
+// All functions receive x = input * driveGain where driveGain = 10^(drive*40/20).
+// At drive=0.25: driveGain ≈ 3.2x  (x can reach ±3 for 0dBFS in)
+// At drive=0.5:  driveGain ≈ 10x   (x can reach ±10)
+// Each function must produce distinct harmonic character in the ±1 to ±10 range.
 //==============================================================================
 
+// Tube: asymmetric x/(1+|x|) — positive half clips harder than negative.
+// Heavy asymmetry → dominant 2nd harmonic (even: warm, musical).
 float ColourBrickwallScreamAudioProcessor::saturateTube (float x, float /*drive*/) noexcept
 {
-    // Devereux soft-clip: y = (3x/2)(1 - x²/3), clamped to [-1,+1]
-    const float xc = juce::jlimit (-1.0f, 1.0f, x);
-    return (1.5f * xc) * (1.0f - (xc * xc) / 3.0f);
+    if (x >= 0.0f)
+        return x / (1.0f + x);            // clips to 1.0 (positive asymptote)
+    else
+        return x / (1.0f - x * 0.55f);   // softer negative side (clips to −1/0.55 ≈ −1.82)
 }
 
+// Tape: symmetric tanh core + 3rd-harmonic flavour injection.
+// Soft & even, with a slight "woolly" presence from harmonic stacking.
 float ColourBrickwallScreamAudioProcessor::saturateTape (float x, float /*drive*/) noexcept
 {
-    return std::tanh (x);
+    const float t1 = std::tanh (x);                         // fundamental saturation
+    const float t3 = std::tanh (x * 2.5f) / 2.5f;          // compressed 3rd harmonic layer
+    return t1 * 0.80f + t3 * 0.20f;
 }
 
+// Transformer: linear → sharp knee at ±0.7, then quick hard saturation.
+// Punchy "slam": transients pass clean then hit a wall.
 float ColourBrickwallScreamAudioProcessor::saturateTransformer (float x, float /*drive*/) noexcept
 {
-    // y = x / (1 + |x|^0.7) — asymmetric iron-core feel
     const float absX = std::abs (x);
-    const float denom = 1.0f + std::pow (absX, 0.7f);
-    return x / denom;
+    const float threshold = 0.70f;
+    if (absX <= threshold)
+        return x;
+    const float excess = absX - threshold;
+    // Hard saturation beyond knee: approaches threshold + 0.30 max
+    const float sat = threshold + std::tanh (excess * 3.0f) * 0.30f;
+    return std::copysign (sat, x);
 }
 
+// Diode: hard asymmetric clip — guitar-pedal silicon diode character.
+// Positive half clips at 0.60 (very hard), negative at 0.85 (slightly softer).
+// Large asymmetry → strong even + odd harmonics, bright and aggressive.
 float ColourBrickwallScreamAudioProcessor::saturateDiode (float x, float /*drive*/) noexcept
 {
-    // Asymmetric hard clip: upper at 0.9, lower at -0.75
-    return juce::jlimit (-0.75f, 0.9f, x);
+    if (x > 0.60f)
+        return 0.60f + (x - 0.60f) * 0.08f;   // 8% ratio past threshold: nearly flat
+    if (x < -0.85f)
+        return -0.85f + (x + 0.85f) * 0.15f;  // slightly softer negative clip
+    return x;
 }
 
 float ColourBrickwallScreamAudioProcessor::getBitDepthFromDrive (float normDrive) noexcept
 {
-    // Map 0–1 drive to 16–4 bits (higher drive = lower bit depth = more grit)
-    return 16.0f - normDrive * 12.0f;  // 16 at drive=0, 4 at drive=1
+    // Drive 0→1 maps to 16→4 bits (higher drive = more quantisation)
+    return 16.0f - normDrive * 12.0f;
 }
 
+// Bitcrush: pre-clip via tanh then quantise to drive-dependent bit depth.
+// Creates staircase distortion — instantly recognisable digital texture.
 float ColourBrickwallScreamAudioProcessor::saturateBitcrush (float x, float drive) noexcept
 {
     const float bits  = getBitDepthFromDrive (drive);
-    const float steps = std::pow (2.0f, bits);
-    return std::round (x * steps) / steps;
+    const float steps = std::pow (2.0f, std::max (2.0f, bits - 1.0f));
+    const float clamped = std::tanh (x);   // soft-clip to ±1 before quantising
+    return std::round (clamped * steps) / steps;
 }
 
+// Full Scream: wavefolding via sin — wildly different harmonic structure.
+// At drive=0.25: foldGain=3.25 (≈3 folds); at drive=1.0: foldGain=8 (≈8 folds).
+// Each additional fold inverts the waveform, cascading harmonics.
 float ColourBrickwallScreamAudioProcessor::saturateFullScream (float x, float drive) noexcept
 {
-    // Wavefolding: y = sin(π * x * (1 + drive * 3))
-    const float period = 1.0f + drive * 3.0f;
-    return std::sin (juce::MathConstants<float>::pi * x * period);
+    const float foldGain = 3.0f + drive * 5.0f;
+    return std::sin (juce::MathConstants<float>::pi * x * foldGain);
 }
 
 //==============================================================================
 // COLOUR FILTER SETUP
+// Each character gets a high-gain filter that pushes a signature frequency
+// band hard into the post-saturation tanh, creating distinct harmonic textures.
 //==============================================================================
 void ColourBrickwallScreamAudioProcessor::ColourFilter::prepare (const juce::dsp::ProcessSpec& spec)
 {
@@ -257,23 +252,23 @@ void ColourBrickwallScreamAudioProcessor::updateColourFilter (int variant, doubl
 
     switch (variant)
     {
-        case 0:  // Tube: low-mid warmth boost (300Hz, +4dB, Q=0.7)
-            c = BiquadCoeffs::makePeakFilter (sr, 300.0, 0.7, 4.0f);
+        case 0:  // Tube: fat low-mid warmth (+14dB at 250Hz, Q=0.5)
+            c = BiquadCoeffs::makePeakFilter (sr, 250.0, 0.5, 14.0f);
             break;
-        case 1:  // Tape: presence air high shelf (10kHz, +3dB)
-            c = BiquadCoeffs::makeHighShelf (sr, 10000.0, 0.7, 3.0f);
+        case 1:  // Tape: presence + air (+14dB high shelf at 3.5kHz)
+            c = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7, 14.0f);
             break;
-        case 2:  // Transformer: mid bloom peak (900Hz, +5dB, Q=1.2)
-            c = BiquadCoeffs::makePeakFilter (sr, 900.0, 1.2, 5.0f);
+        case 2:  // Transformer: aggressive mid honk (+15dB at 1.5kHz, Q=2.5)
+            c = BiquadCoeffs::makePeakFilter (sr, 1500.0, 2.5, 15.0f);
             break;
-        case 3:  // Diode: upper-mid bite (4kHz, +5dB, Q=1.5)
-            c = BiquadCoeffs::makePeakFilter (sr, 4000.0, 1.5, 5.0f);
+        case 3:  // Diode: sibilant bite (+15dB at 5kHz, Q=3.0)
+            c = BiquadCoeffs::makePeakFilter (sr, 5000.0, 3.0, 15.0f);
             break;
-        case 4:  // Bitcrush: high-end grit (8kHz, +6dB, Q=2.0)
-            c = BiquadCoeffs::makePeakFilter (sr, 8000.0, 2.0, 6.0f);
+        case 4:  // Bitcrush: harsh presence (+15dB at 10kHz, Q=4.0)
+            c = BiquadCoeffs::makePeakFilter (sr, 10000.0, 4.0, 15.0f);
             break;
-        case 5:  // Full Scream: subharmonic low shelf (80Hz, +6dB)
-            c = BiquadCoeffs::makeLowShelf (sr, 80.0, 0.7, 6.0f);
+        case 5:  // Full Scream: subharmonic rumble (+16dB low shelf at 100Hz)
+            c = BiquadCoeffs::makeLowShelf (sr, 100.0, 0.5, 16.0f);
             break;
         default:
             c = BiquadCoeffs::makeAllPass (sr, 1000.0, 0.7);
@@ -284,49 +279,26 @@ void ColourBrickwallScreamAudioProcessor::updateColourFilter (int variant, doubl
 }
 
 //==============================================================================
-// TONE FILTER UPDATE
+// TONE FILTER UPDATE — dual-shelf tilt EQ
+//   Positive: +high shelf (3.5kHz) + -low shelf (250Hz) → brighter
+//   Negative: -high shelf (3.5kHz) + +low shelf (250Hz) → warmer
+//   Zero: both shelves at 0dB → transparent
 //==============================================================================
 void ColourBrickwallScreamAudioProcessor::updateToneFilter (float toneValue, double sr)
 {
-    // Tilt EQ: bipolar tone control ±1.0 → ±6dB at pivot ~1kHz
-    // Positive = high shelf boost + low shelf cut (brighter)
-    // Negative = low shelf boost + high shelf cut (darker)
-    // We implement as a single shelving filter approximation:
-    // use a high shelf centred at 1kHz, scaled by toneValue
+    lastToneValue = toneValue;
 
-    const float gainDb = toneValue * 6.0f;   // ±6dB
+    const float gainHigh = toneValue * 9.0f;   // ±9dB high shelf
+    const float gainLow  = -toneValue * 6.0f;  // ±6dB low shelf (opposite polarity)
 
-    BiquadCoeffs::Ptr c;
-    if (std::abs (gainDb) < 0.05f)
-    {
-        c = BiquadCoeffs::makeAllPass (sr, 1000.0, 0.7);
-    }
-    else if (gainDb > 0.0f)
-    {
-        // Brighter: high shelf boost
-        c = BiquadCoeffs::makeHighShelf (sr, 1000.0, 0.7, static_cast<double> (gainDb));
-    }
-    else
-    {
-        // Darker: low shelf boost (equivalent to cutting highs)
-        c = BiquadCoeffs::makeLowShelf (sr, 1000.0, 0.7, static_cast<double> (-gainDb));
-    }
+    auto cHigh = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7, static_cast<double> (gainHigh));
+    auto cLow  = BiquadCoeffs::makeLowShelf  (sr, 250.0,  0.7, static_cast<double> (gainLow));
 
     for (int ch = 0; ch < numChannels_; ++ch)
-        *toneFilter[ch].coefficients = *c;
-}
-
-//==============================================================================
-// LIMITER COEFFICIENT UPDATE
-//==============================================================================
-void ColourBrickwallScreamAudioProcessor::updateLimiterCoeffs (float attackNorm, float /*ceilingDb*/, double sr)
-{
-    // Map attack_character [0,1] → attack time [0.1ms, 50ms] log scale
-    const double minAtk = 0.0001;   // 0.1ms
-    const double maxAtk = 0.050;    // 50ms
-    const double atkTime = minAtk * std::pow (maxAtk / minAtk, static_cast<double> (attackNorm));
-
-    attackCoeff = static_cast<float> (std::exp (-1.0 / (atkTime * sr)));
+    {
+        *toneFilterHigh[ch].coefficients = *cHigh;
+        *toneFilterLow[ch].coefficients  = *cLow;
+    }
 }
 
 //==============================================================================
@@ -354,13 +326,13 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
 {
     juce::ScopedNoDenormals noDenormals;
 
-    const int numSamples  = buffer.getNumSamples();
-    const int numCh       = std::min (buffer.getNumChannels(), numChannels_);
+    const int numSamples = buffer.getNumSamples();
+    const int numCh      = std::min (buffer.getNumChannels(), numChannels_);
 
     if (numSamples == 0 || numCh == 0)
         return;
 
-    // Clear any extra output channels
+    // Clear extra output channels
     for (int ch = numCh; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, numSamples);
 
@@ -369,21 +341,15 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
     const int   charParam  = static_cast<int> (apvts.getRawParameterValue (ParameterIDs::CHARACTER)->load());
     const float colourNorm = apvts.getRawParameterValue (ParameterIDs::COLOUR)->load();
     const float toneNorm   = apvts.getRawParameterValue (ParameterIDs::TONE)->load();
-    const float atkNorm    = apvts.getRawParameterValue (ParameterIDs::ATTACK_CHARACTER)->load();
     const float ceilDb     = apvts.getRawParameterValue (ParameterIDs::CEILING)->load();
     const float mixNorm    = apvts.getRawParameterValue (ParameterIDs::MIX)->load();
-    const float outGainDb  = apvts.getRawParameterValue (ParameterIDs::OUTPUT_GAIN)->load();
 
-    // Update targets for smoothers
-    smoothDrive.setTargetValue (driveNorm);
+    // Update smoother targets
+    smoothDrive.setTargetValue  (driveNorm);
     smoothColour.setTargetValue (colourNorm);
-    smoothTone.setTargetValue (toneNorm);
-    smoothAttack.setTargetValue (atkNorm);
-    smoothCeiling.setTargetValue (ceilDb);
-    smoothMix.setTargetValue (mixNorm);
-    smoothOutputGain.setTargetValue (juce::Decibels::decibelsToGain (outGainDb));
+    smoothMix.setTargetValue    (mixNorm);
 
-    // Handle character change → trigger crossfade
+    // Handle character change → crossfade
     if (charParam != targetChar)
     {
         currentChar  = targetChar;
@@ -391,52 +357,31 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
         crossfadePos = 0.0f;
     }
 
-    // Update limiter and tone coefficients when parameters change
-    // (block-rate check, cheap enough)
-    {
-        const float atkSnap  = smoothAttack.getTargetValue();
-        const float ceilSnap = smoothCeiling.getTargetValue();
-        updateLimiterCoeffs (atkSnap, ceilSnap, sampleRate_);
-    }
-    if (std::abs (smoothTone.getTargetValue() - lastToneValue) > 0.005f)
-    {
-        updateToneFilter (smoothTone.getTargetValue(), sampleRate_);
-        lastToneValue = smoothTone.getTargetValue();
-    }
+    // Update tone filter at block rate when value changes
+    if (std::abs (toneNorm - lastToneValue) > 0.005f)
+        updateToneFilter (toneNorm, sampleRate_);
 
-    // ── Input metering tap ─────────────────────────────────────────────────────
+    // ── Input metering ─────────────────────────────────────────────────────────
     float inputPeak = 0.0f;
     for (int ch = 0; ch < numCh; ++ch)
         inputPeak = std::max (inputPeak, buffer.getMagnitude (ch, 0, numSamples));
 
-    const float meterAtkFactor = kMeterAttack;
-    const float meterRelFactor = kMeterRelease;
     meterInSmoothed = (inputPeak > meterInSmoothed)
-        ? meterInSmoothed + (inputPeak - meterInSmoothed) * meterAtkFactor
-        : meterInSmoothed + (inputPeak - meterInSmoothed) * meterRelFactor;
+        ? meterInSmoothed + (inputPeak - meterInSmoothed) * kMeterAttack
+        : meterInSmoothed + (inputPeak - meterInSmoothed) * kMeterRelease;
     meterInput.store (meterInSmoothed);
 
-    // ── Dry buffer write (latency-compensated) ─────────────────────────────────
-    {
-        const int bufSize = dryBuffer.getNumSamples();
-        for (int ch = 0; ch < numCh; ++ch)
-        {
-            const float* src = buffer.getReadPointer (ch);
-            float*       dst = dryBuffer.getWritePointer (ch);
-            for (int i = 0; i < numSamples; ++i)
-                dst[(dryWritePos + i) % bufSize] = src[i];
-        }
-        dryWritePos = (dryWritePos + numSamples) % bufSize;
-    }
+    // ── Store dry copy ─────────────────────────────────────────────────────────
+    for (int ch = 0; ch < numCh; ++ch)
+        dryBuffer.copyFrom (ch, 0, buffer, ch, 0, numSamples);
 
     // ── Per-sample processing ──────────────────────────────────────────────────
     for (int i = 0; i < numSamples; ++i)
     {
         const float driveSample  = smoothDrive.getNextValue();
         const float colourSample = smoothColour.getNextValue();
-        // (tone, attack, ceiling, mix, output consumed below)
 
-        // Map drive 0–1 → linear pre-gain
+        // Drive: 0–1 → 0–40dB pre-gain
         const float driveGain = juce::Decibels::decibelsToGain (driveSample * 40.0f);
 
         for (int ch = 0; ch < numCh; ++ch)
@@ -452,7 +397,7 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
                     case 1:
                     {
                         float s = saturateTape (samp, driveSample);
-                        // Tape LPF (1-pole per channel)
+                        // 1-pole tape roll-off (~14kHz)
                         s = s * (1.0f - tapeLPFCoeff) + tapeLPFState[ch] * tapeLPFCoeff;
                         tapeLPFState[ch] = s;
                         return s;
@@ -477,80 +422,58 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
                 satOut = s1 + crossfadePos * (s2 - s1);
             }
 
-            // ── Colour blend ───────────────────────────────────────────────────
-            const float coloured = colourFilters[targetChar].processSample (ch, satOut);
-            x = satOut + colourSample * (coloured - satOut);
+            // ── Colour: harmonic texture blend ─────────────────────────────────
+            // The character filter strongly boosts a signature frequency band.
+            // Passing that through tanh creates harmonics from those boosted freqs.
+            // Squared blend curve: even at 50% colour the effect is clearly audible.
+            {
+                const float filtered = colourFilters[targetChar].processSample (ch, satOut);
+                const float resat    = std::tanh (filtered);
+                const float blend    = colourSample * colourSample;
+                x = satOut * (1.0f - blend) + resat * blend;
+            }
 
-            // ── Tone ───────────────────────────────────────────────────────────
-            x = toneFilter[ch].processSample (x);
+            // ── Tone: dual-shelf tilt EQ ───────────────────────────────────────
+            x = toneFilterHigh[ch].processSample (x);
+            x = toneFilterLow[ch].processSample  (x);
 
             buffer.setSample (ch, i, x);
         }
 
-        // Advance crossfade (channel-independent)
+        // Advance crossfade
         if (crossfadePos < 1.0f)
             crossfadePos = std::min (1.0f, crossfadePos + crossfadeInc);
     }
 
     // ── Brickwall Limiter ──────────────────────────────────────────────────────
-    // Write to lookahead ring buffer, read back delayed version
+    // Simple per-sample peak limiter. Uses raw ceilDb parameter directly
+    // (no smoother — fixes the bug where smoothCeiling.getCurrentValue()
+    // was never advanced and stayed at the initial value forever).
     {
-        const float ceilingLinear = juce::Decibels::decibelsToGain (
-            smoothCeiling.getCurrentValue());
+        const float ceilingLinear = juce::Decibels::decibelsToGain (ceilDb);
 
-        const int bufSize = lookaheadBuf.getNumSamples();
-        int   readPos  = (lookaheadWritePos - lookaheadSamples + bufSize) % bufSize;
-
-        // 4x oversampled peak detection
-        // We'll do detection on the non-oversampled signal for simplicity
-        // (true-peak detection via oversampler happens on the write path)
-        juce::dsp::AudioBlock<float> inputBlock (buffer);
-        auto oversampledBlock = oversampler.processSamplesUp (inputBlock);
-
-        const int osNumSamples = static_cast<int> (oversampledBlock.getNumSamples());
-        float peakOS = 0.0f;
-        for (int ch = 0; ch < numCh; ++ch)
-            for (int i = 0; i < osNumSamples; ++i)
-                peakOS = std::max (peakOS, std::abs (oversampledBlock.getSample (ch, i)));
-
-        juce::dsp::AudioBlock<float> outputBlock (buffer);
-        oversampler.processSamplesDown (outputBlock);
-
-        // Write current samples to lookahead buffer
-        for (int ch = 0; ch < numCh; ++ch)
-        {
-            float* dst = lookaheadBuf.getWritePointer (ch);
-            const float* src = buffer.getReadPointer (ch);
-            for (int i = 0; i < numSamples; ++i)
-                dst[(lookaheadWritePos + i) % bufSize] = src[i];
-        }
-
-        // Read delayed samples and apply gain reduction
         for (int i = 0; i < numSamples; ++i)
         {
-            const int rPos = (readPos + i) % bufSize;
+            // Peak across all channels at this sample
+            float peak = 0.0f;
+            for (int ch = 0; ch < numCh; ++ch)
+                peak = std::max (peak, std::abs (buffer.getSample (ch, i)));
 
-            // Gain reduction: peak from this-plus-lookahead position
-            // Use block-level peak from oversampler for true-peak ceiling
-            const float targetGR = (peakOS > ceilingLinear && peakOS > 1e-6f)
-                                   ? (ceilingLinear / peakOS)
-                                   : 1.0f;
+            const float targetGR = (peak > ceilingLinear && peak > 1e-6f)
+                                   ? (ceilingLinear / peak) : 1.0f;
 
-            // Smooth with attack/release
             if (targetGR < grEnvelope)
-                grEnvelope = grEnvelope * attackCoeff + targetGR * (1.0f - attackCoeff);
+                grEnvelope = grEnvelope * attackCoeff  + targetGR * (1.0f - attackCoeff);
             else
                 grEnvelope = grEnvelope * releaseCoeff + targetGR * (1.0f - releaseCoeff);
 
             grEnvelope = juce::jlimit (0.0f, 1.0f, grEnvelope);
 
             for (int ch = 0; ch < numCh; ++ch)
-                buffer.setSample (ch, i, lookaheadBuf.getSample (ch, rPos) * grEnvelope);
+                buffer.setSample (ch, i, buffer.getSample (ch, i) * grEnvelope);
         }
 
-        lookaheadWritePos = (lookaheadWritePos + numSamples) % bufSize;
-
-        // GR meter smoothing
+        // GR meter
         const float grReduction = 1.0f - grEnvelope;
         grMeterSmoothed = (grReduction > grMeterSmoothed)
             ? grMeterSmoothed + (grReduction - grMeterSmoothed) * kMeterAttack
@@ -558,36 +481,21 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
         meterGR.store (grMeterSmoothed);
     }
 
-    // ── Output gain ────────────────────────────────────────────────────────────
+    // ── Mix blend (dry / wet) ──────────────────────────────────────────────────
     for (int i = 0; i < numSamples; ++i)
     {
-        const float outGain = smoothOutputGain.getNextValue();
+        const float wet = smoothMix.getNextValue();
+        const float dry = 1.0f - wet;
+
         for (int ch = 0; ch < numCh; ++ch)
-            buffer.setSample (ch, i, buffer.getSample (ch, i) * outGain);
-    }
-
-    // ── Mix blend (dry/wet) ────────────────────────────────────────────────────
-    // Read dry buffer (latency-compensated)
-    {
-        const int bufSize = dryBuffer.getNumSamples();
-        const int dryReadBase = (dryWritePos - lookaheadSamples - numSamples + bufSize * 2) % bufSize;
-
-        for (int i = 0; i < numSamples; ++i)
         {
-            const float wet = smoothMix.getNextValue();
-            const float dry = 1.0f - wet;
-            const int   rPos = (dryReadBase + i) % bufSize;
-
-            for (int ch = 0; ch < numCh; ++ch)
-            {
-                const float dryS = dryBuffer.getSample (ch, rPos);
-                const float wetS = buffer.getSample (ch, i);
-                buffer.setSample (ch, i, dry * dryS + wet * wetS);
-            }
+            const float dryS = dryBuffer.getSample (ch, i);
+            const float wetS = buffer.getSample (ch, i);
+            buffer.setSample (ch, i, dry * dryS + wet * wetS);
         }
     }
 
-    // ── Output metering tap ────────────────────────────────────────────────────
+    // ── Output metering ────────────────────────────────────────────────────────
     float outputPeak = 0.0f;
     for (int ch = 0; ch < numCh; ++ch)
         outputPeak = std::max (outputPeak, buffer.getMagnitude (ch, 0, numSamples));
@@ -621,7 +529,7 @@ bool ColourBrickwallScreamAudioProcessor::producesMidi() const { return false; }
 bool ColourBrickwallScreamAudioProcessor::isMidiEffect() const { return false; }
 double ColourBrickwallScreamAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int ColourBrickwallScreamAudioProcessor::getNumPrograms()   { return 1; }
+int ColourBrickwallScreamAudioProcessor::getNumPrograms()    { return 1; }
 int ColourBrickwallScreamAudioProcessor::getCurrentProgram() { return 0; }
 void ColourBrickwallScreamAudioProcessor::setCurrentProgram (int) {}
 const juce::String ColourBrickwallScreamAudioProcessor::getProgramName (int) { return {}; }
