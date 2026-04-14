@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ColourBrickwallScream</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0D0A09;
+  --panel:     #131010;
+  --raised:    #1C1815;
+  --accent:    #FF3C00;
+  --accent2:   #FF6830;
+  --glow:      rgba(255, 60, 0, 0.35);
+  --glow-deep: rgba(255, 60, 0, 0.12);
+  --text:      #DDD0C8;
+  --dim:       #5A4D48;
+  --label:     #887068;
+  --border:    #2A2220;
+  --sep:       #241E1C;
+}
+
+body {
+  background: var(--bg);
+  width: 700px;
+  height: 500px;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+  position: relative;
+}
+
+/* Noise texture overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
+}
+
+/* ─── LAYOUT ─────────────────────────────────────────── */
+#root {
+  display: flex;
+  flex-direction: column;
+  width: 700px;
+  height: 500px;
+}
+
+/* ─── HEADER ──────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  height: 62px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--sep);
+  padding: 0 16px;
+  gap: 20px;
+}
+
+#plugin-name-block { flex: 0 0 auto; }
+
+#plugin-name {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+#plugin-sub {
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+#meters-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+}
+
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.m-label {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--label);
+  width: 18px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.m-canvas {
+  flex: 1;
+  height: 10px;
+  display: block;
+  border-radius: 1px;
+  background: #0A0806;
+}
+
+.m-val {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  width: 48px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ─── MAIN AREA ───────────────────────────────────────── */
+#main-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.side-section {
+  flex: 0 0 155px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+}
+
+#center-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.knob-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--label);
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1;
+}
+
+.knob-value {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--accent2);
+  text-align: center;
+  min-height: 12px;
+  line-height: 1;
+}
+
+canvas.knob { display: block; cursor: ns-resize; }
+
+/* ─── CHARACTER SELECTOR ─────────────────────────────── */
+#char-sel {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.char-btn {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  border-radius: 2px;
+  transition: border-color 0.08s, color 0.08s, box-shadow 0.08s;
+  outline: none;
+}
+
+.char-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.char-btn.active {
+  background: var(--glow-deep);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px var(--glow), inset 0 0 6px var(--glow-deep);
+}
+
+/* ─── SEPARATOR ───────────────────────────────────────── */
+.sep { height: 1px; background: var(--sep); flex-shrink: 0; }
+
+/* ─── BOTTOM ROW ──────────────────────────────────────── */
+#bottom-row {
+  height: 131px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--panel);
+  border-top: 1px solid var(--sep);
+  padding: 0 20px;
+}
+
+.small-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div id="plugin-name-block">
+      <div id="plugin-name">ColourBrickwall<br>Scream</div>
+      <div id="plugin-sub">Harmonic Saturator &middot; Brickwall Limiter</div>
+    </div>
+    <div id="meters-block">
+      <div class="meter-row">
+        <span class="m-label">IN</span>
+        <canvas class="m-canvas" id="m-in" height="10"></canvas>
+        <span class="m-val" id="mv-in">— dB</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">GR</span>
+        <canvas class="m-canvas" id="m-gr" height="10"></canvas>
+        <span class="m-val" id="mv-gr">— dB</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">OUT</span>
+        <canvas class="m-canvas" id="m-out" height="10"></canvas>
+        <span class="m-val" id="mv-out">— dB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div id="main-area">
+
+    <!-- TONE (left) -->
+    <div class="side-section">
+      <canvas class="knob" id="k-tone" width="100" height="100"
+        data-param="tone" data-norm="0.5"
+        data-min="-1" data-max="1" data-default="0" data-bipolar="1"></canvas>
+      <div class="knob-label">Tone</div>
+      <div class="knob-value" id="v-tone">0.00</div>
+    </div>
+
+    <!-- CENTER -->
+    <div id="center-section">
+      <canvas class="knob" id="k-drive" width="180" height="180"
+        data-param="drive" data-norm="0.25"
+        data-min="0" data-max="1" data-default="0.25" data-bipolar="0"></canvas>
+      <div class="knob-label" style="font-size:10px;letter-spacing:3px;">Drive / Scream</div>
+      <div class="knob-value" id="v-drive">10.0 dB</div>
+      <div id="char-sel">
+        <button class="char-btn active" data-char="0">TUBE</button>
+        <button class="char-btn" data-char="1">TAPE</button>
+        <button class="char-btn" data-char="2">XFMR</button>
+        <button class="char-btn" data-char="3">DIODE</button>
+        <button class="char-btn" data-char="4">BITCR</button>
+        <button class="char-btn" data-char="5">SCREAM</button>
+      </div>
+    </div>
+
+    <!-- COLOUR (right) -->
+    <div class="side-section">
+      <canvas class="knob" id="k-colour" width="100" height="100"
+        data-param="colour" data-norm="0"
+        data-min="0" data-max="1" data-default="0" data-bipolar="0"></canvas>
+      <div class="knob-label">Colour</div>
+      <div class="knob-value" id="v-colour">0%</div>
+    </div>
+
+  </div>
+
+  <!-- SEPARATOR -->
+  <div class="sep"></div>
+
+  <!-- BOTTOM ROW -->
+  <div id="bottom-row">
+    <div class="small-section">
+      <canvas class="knob" id="k-attack" width="80" height="80"
+        data-param="attack_character" data-norm="0.5"
+        data-min="0" data-max="1" data-default="0.5" data-bipolar="0"></canvas>
+      <div class="knob-label">Attack</div>
+      <div class="knob-value" id="v-attack">4.9 ms</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-ceiling" width="80" height="80"
+        data-param="ceiling" data-norm="0.975"
+        data-min="-12" data-max="0" data-default="-0.3" data-bipolar="0"></canvas>
+      <div class="knob-label">Ceiling</div>
+      <div class="knob-value" id="v-ceiling">-0.3 dBFS</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-mix" width="80" height="80"
+        data-param="mix" data-norm="1"
+        data-min="0" data-max="1" data-default="1" data-bipolar="0"></canvas>
+      <div class="knob-label">Mix</div>
+      <div class="knob-value" id="v-mix">100%</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-output" width="80" height="80"
+        data-param="output_gain" data-norm="0.5"
+        data-min="-12" data-max="12" data-default="0" data-bipolar="1"></canvas>
+      <div class="knob-label">Output</div>
+      <div class="knob-value" id="v-output">0.0 dB</div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+
+const START  = (2 * Math.PI) / 3;   // 120° — 7 o'clock
+const SWEEP  = (5 * Math.PI) / 3;   // 300° — full range
+const CENTER = START + SWEEP * 0.5; // 270° — 12 o'clock (bipolar zero)
+
+const C = {
+  BG:       '#0D0A09',
+  RAISED:   '#1C1815',
+  RIM:      '#2E2825',
+  BODY_HI:  '#2A2420',
+  BODY_LO:  '#111010',
+  TRACK:    '#2A2220',
+  ACCENT:   '#FF3C00',
+  ACCENT2:  '#FF6830',
+  ACCENT_D: '#CC3000',
+  CENTER_D: '#2E2825',
+};
+
+// ═══════════════════════════════════════════════════════
+// KNOB RENDERER
+// ═══════════════════════════════════════════════════════
+
+function drawKnob(canvas, norm) {
+  const ctx  = canvas.getContext('2d');
+  const w    = canvas.width;
+  const h    = canvas.height;
+  const cx   = w / 2;
+  const cy   = h / 2;
+  const big  = w >= 160;
+  const r    = Math.min(w, h) / 2 - (big ? 8 : 6);
+  const inR  = r * 0.70;
+  const trR  = r * 0.83;
+  const trW  = big ? 4 : 3;
+  const bp   = canvas.dataset.bipolar === '1';
+  const angle = START + norm * SWEEP;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // High-value glow ring (drive only)
+  if (big && norm > 0.78) {
+    const alpha = Math.min(1, (norm - 0.78) * 4);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,60,0,${alpha * 0.5})`;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+  }
+
+  // Outer bezel
+  const bzG = ctx.createRadialGradient(cx - r * 0.28, cy - r * 0.28, 0, cx, cy, r);
+  bzG.addColorStop(0, '#3C3330');
+  bzG.addColorStop(0.55, '#201A18');
+  bzG.addColorStop(1, '#141210');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = bzG;
+  ctx.fill();
+
+  // Bezel rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = C.RIM;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Inner body
+  const bdG = ctx.createRadialGradient(cx - inR * 0.22, cy - inR * 0.22, 0, cx, cy, inR);
+  bdG.addColorStop(0, C.BODY_HI);
+  bdG.addColorStop(0.65, '#181412');
+  bdG.addColorStop(1, C.BODY_LO);
+  ctx.beginPath();
+  ctx.arc(cx, cy, inR, 0, Math.PI * 2);
+  ctx.fillStyle = bdG;
+  ctx.fill();
+
+  // Track background
+  ctx.beginPath();
+  ctx.arc(cx, cy, trR, START, START + SWEEP, false);
+  ctx.strokeStyle = C.TRACK;
+  ctx.lineWidth = trW;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Active arc
+  const drawArc = (fromA, toA) => {
+    if (Math.abs(toA - fromA) < 0.01) return;
+    const arcG = ctx.createLinearGradient(
+      cx + Math.cos(fromA) * trR, cy + Math.sin(fromA) * trR,
+      cx + Math.cos(toA)   * trR, cy + Math.sin(toA)   * trR
+    );
+    arcG.addColorStop(0, C.ACCENT_D);
+    arcG.addColorStop(1, C.ACCENT2);
+    ctx.beginPath();
+    ctx.arc(cx, cy, trR, fromA, toA, false);
+    ctx.strokeStyle = arcG;
+    ctx.lineWidth = trW;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  };
+
+  if (bp) {
+    if (norm > 0.5 + 0.01) drawArc(CENTER, angle);
+    else if (norm < 0.5 - 0.01) drawArc(angle, CENTER);
+  } else {
+    if (norm > 0.005) drawArc(START, angle);
+  }
+
+  // Indicator line
+  const iS = inR * 0.18;
+  const iE = inR * 0.70;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(angle) * iS, cy + Math.sin(angle) * iS);
+  ctx.lineTo(cx + Math.cos(angle) * iE, cy + Math.sin(angle) * iE);
+  ctx.strokeStyle = C.ACCENT;
+  ctx.lineWidth   = big ? 2.5 : 2;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Indicator dot
+  ctx.beginPath();
+  ctx.arc(cx + Math.cos(angle) * iE, cy + Math.sin(angle) * iE, big ? 3.5 : 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = C.ACCENT2;
+  ctx.fill();
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, big ? 4 : 3, 0, Math.PI * 2);
+  ctx.fillStyle = C.CENTER_D;
+  ctx.fill();
+
+  // Tick marks at min / center / max (large knob only)
+  if (big) {
+    [[START, 0.6], [CENTER, 0.6], [START + SWEEP, 0.6]].forEach(([a, alpha]) => {
+      const tO = r - 2;
+      const tI = r - 7;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * tI, cy + Math.sin(a) * tI);
+      ctx.lineTo(cx + Math.cos(a) * tO, cy + Math.sin(a) * tO);
+      ctx.strokeStyle = `rgba(136,112,104,${alpha})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// VALUE FORMATTING
+// ═══════════════════════════════════════════════════════
+
+const DISPLAYS = {
+  'tone':              (n) => { const v = n*2-1; return (v>=0?'+':'')+v.toFixed(2); },
+  'drive':             (n) => (n*40).toFixed(1)+' dB',
+  'colour':            (n) => Math.round(n*100)+'%',
+  'attack_character':  (n) => { const ms = Math.exp(Math.log(0.1)+n*Math.log(500)); return ms.toFixed(1)+' ms'; },
+  'ceiling':           (n) => { const v = -12+n*12; return v.toFixed(1)+' dBFS'; },
+  'mix':               (n) => Math.round(n*100)+'%',
+  'output_gain':       (n) => { const v = -12+n*24; return (v>=0?'+':'')+v.toFixed(1)+' dB'; },
+};
+
+const VALUE_EL = {
+  'tone': 'v-tone', 'drive': 'v-drive', 'colour': 'v-colour',
+  'attack_character': 'v-attack', 'ceiling': 'v-ceiling',
+  'mix': 'v-mix', 'output_gain': 'v-output',
+};
+
+// ═══════════════════════════════════════════════════════
+// KNOB STATE & INTERACTION
+// ═══════════════════════════════════════════════════════
+
+const state = {};
+
+function initKnobs() {
+  document.querySelectorAll('canvas.knob').forEach(c => {
+    const p  = c.dataset.param;
+    const n  = parseFloat(c.dataset.norm);
+    state[p] = n;
+    drawKnob(c, n);
+    updateDisplay(p, n);
+
+    let dragY = 0, dragN = 0, dragging = false;
+
+    c.addEventListener('mousedown', e => {
+      dragging = true;
+      dragY    = e.clientY;
+      dragN    = state[p];
+      document.body.style.cursor = 'ns-resize';
+      e.preventDefault();
+    });
+
+    c.addEventListener('dblclick', () => {
+      const def = parseFloat(c.dataset.default);
+      const min = parseFloat(c.dataset.min);
+      const max = parseFloat(c.dataset.max);
+      const n2  = (def - min) / (max - min);
+      state[p]  = n2;
+      drawKnob(c, n2);
+      updateDisplay(p, n2);
+      sendToJuce(p, n2);
+    });
+
+    const onMove = e => {
+      if (!dragging) return;
+      const dy   = dragY - e.clientY;
+      const sens = e.shiftKey ? 0.002 : 0.008;
+      const n2   = Math.max(0, Math.min(1, dragN + dy * sens));
+      state[p]   = n2;
+      drawKnob(c, n2);
+      updateDisplay(p, n2);
+      sendToJuce(p, n2);
+    };
+
+    const onUp = () => { dragging = false; document.body.style.cursor = ''; };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      const d  = -e.deltaY * (e.shiftKey ? 0.0005 : 0.004);
+      const n2 = Math.max(0, Math.min(1, state[p] + d));
+      state[p] = n2;
+      drawKnob(c, n2);
+      updateDisplay(p, n2);
+      sendToJuce(p, n2);
+    }, { passive: false });
+  });
+}
+
+function updateDisplay(param, norm) {
+  const el = document.getElementById(VALUE_EL[param]);
+  if (el && DISPLAYS[param]) el.textContent = DISPLAYS[param](norm);
+}
+
+// ═══════════════════════════════════════════════════════
+// CHARACTER SELECTOR
+// ═══════════════════════════════════════════════════════
+
+let activeChar = 0;
+
+document.querySelectorAll('.char-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeChar = parseInt(btn.dataset.char);
+    sendToJuce('character', activeChar / 5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// METER RENDERER
+// ═══════════════════════════════════════════════════════
+
+function drawMeter(canvas, level, reversed) {
+  const ctx  = canvas.getContext('2d');
+  const w    = canvas.width;
+  const h    = canvas.height;
+  const segs = Math.floor(w / 5);
+  const fill = Math.round(Math.max(0, Math.min(1, level)) * segs);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0A0806';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < segs; i++) {
+    const ratio = reversed ? (1 - i / segs) : (i / segs);
+    const x     = reversed ? (w - (i + 1) * 5 + 1) : (i * 5 + 1);
+    const idx   = reversed ? (segs - 1 - i) : i;
+    const lit   = idx < fill;
+
+    if (ratio < 0.60) ctx.fillStyle = lit ? '#22CC22' : '#1A5C1A';
+    else if (ratio < 0.75) ctx.fillStyle = lit ? '#88CC00' : '#2A5A10';
+    else if (ratio < 0.85) ctx.fillStyle = lit ? '#FFAA00' : '#7A5500';
+    else if (ratio < 0.95) ctx.fillStyle = lit ? '#FF4400' : '#8A2A00';
+    else ctx.fillStyle = lit ? '#FF1100' : '#6A0000';
+
+    ctx.fillRect(x, 1, 4, h - 2);
+  }
+}
+
+function resizeMeters() {
+  document.querySelectorAll('.m-canvas').forEach(c => {
+    c.width = Math.max(1, Math.floor(c.getBoundingClientRect().width));
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// PREVIEW ANIMATION
+// ═══════════════════════════════════════════════════════
+
+let mIn = 0, mGR = 0, mOut = 0;
+
+function animateMeters() {
+  const t  = Date.now() / 1000;
+  const tI = 0.60 + Math.sin(t*3.1)*0.17 + Math.sin(t*7.3)*0.06 + Math.sin(t*13.7)*0.03;
+  const tG = 0.28 + Math.sin(t*2.7+1)*0.14 + Math.sin(t*5.9)*0.04;
+  const tO = 0.52 + Math.sin(t*3.4+.5)*0.15 + Math.sin(t*6.8)*0.05;
+
+  const atk  = v => v * 0.70;
+  const rel  = v => v * 0.09;
+  const ease = (cur, tgt) => cur + ((tgt > cur ? atk(tgt-cur) : -rel(cur-tgt)));
+
+  mIn  = ease(mIn,  tI);
+  mGR  = ease(mGR,  tG);
+  mOut = ease(mOut, tO);
+
+  const cIn  = document.getElementById('m-in');
+  const cGR  = document.getElementById('m-gr');
+  const cOut = document.getElementById('m-out');
+
+  drawMeter(cIn,  mIn,  false);
+  drawMeter(cGR,  mGR,  true);
+  drawMeter(cOut, mOut, false);
+
+  const toDb = v => (20 * Math.log10(Math.max(v, 0.001))).toFixed(1);
+  document.getElementById('mv-in').textContent  = toDb(mIn * 0.95)  + ' dB';
+  document.getElementById('mv-gr').textContent  = '-' + Math.abs(toDb(1 - mGR * 0.6)) + ' dB';
+  document.getElementById('mv-out').textContent = toDb(mOut * 0.90) + ' dB';
+
+  requestAnimationFrame(animateMeters);
+}
+
+// ═══════════════════════════════════════════════════════
+// JUCE BRIDGE  (production — replaces preview animation)
+// ═══════════════════════════════════════════════════════
+
+function sendToJuce(paramId, normValue) {
+  if (typeof window.__JUCE__ !== 'undefined') {
+    window.__JUCE__.backend.sendMessage({ type: 'parameterChange', id: paramId, value: normValue });
+  }
+}
+
+function setupJuceBridge() {
+  if (typeof window.__JUCE__ === 'undefined') return;
+
+  window.__JUCE__.backend.addEventListener('parameterChanged', e => {
+    const { id, value } = e.data;
+    if (state[id] !== undefined) {
+      state[id] = value;
+      const c = document.querySelector(`[data-param="${id}"]`);
+      if (c && c.tagName === 'CANVAS') { drawKnob(c, value); updateDisplay(id, value); }
+    }
+    if (id === 'character') {
+      const idx = Math.round(value * 5);
+      document.querySelectorAll('.char-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+    }
+  });
+
+  window.__JUCE__.backend.addEventListener('meterUpdate', e => {
+    const { input, gr, output } = e.data;
+    drawMeter(document.getElementById('m-in'),  input,  false);
+    drawMeter(document.getElementById('m-gr'),  gr,     true);
+    drawMeter(document.getElementById('m-out'), output, false);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  resizeMeters();
+  initKnobs();
+  animateMeters();
+  setupJuceBridge();
+});
+</script>
+</body>
+</html>

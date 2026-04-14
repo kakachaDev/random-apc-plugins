@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/nf_gnarly_Standalone.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/nf_gnarly_Standalone.dir/objects.a @CMakeFiles/nf_gnarly_Standalone.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-g++ -D_WIN32_WINNT=0x0A00      -DWINVER=0x0A00      -DNOMINMAX      -DWIN32_LEAN_AND_MEAN      -Wno-error=cast-function-type -O3 -DNDEBUG -static-libgcc -static-libstdc++ -mwindows -Wl,--whole-archive CMakeFiles/nf_gnarly_Standalone.dir/objects.a -Wl,--no-whole-archive -o nf_gnarly_artefacts/Release/Standalone/Gnarly.exe -Wl,--out-implib,nf_gnarly_artefacts/Release/Standalone/libGnarly.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/nf_gnarly_Standalone.dir/linkLibs.rsp

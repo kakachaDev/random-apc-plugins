@@ -1,0 +1,2 @@
+/usr/bin/x86_64-w64-mingw32-ar qc libgnarly2_WebUI.a CMakeFiles/gnarly2_WebUI.dir/juce_binarydata_gnarly2_WebUI/JuceLibraryCode/BinaryData1.cpp.obj
+/usr/bin/x86_64-w64-mingw32-ranlib libgnarly2_WebUI.a

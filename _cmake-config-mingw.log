@@ -1,0 +1,42 @@
+-- The C compiler identification is GNU 13.0.0
+-- The CXX compiler identification is GNU 13.0.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/x86_64-w64-mingw32-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/x86_64-w64-mingw32-g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- --- APC BUILD SYSTEM ---
+-- Platform: Windows
+-- Root Directory: /home/dev/projects/music/audio-plugin-coder
+-- WebView2: Enabled
+-- Configuring juceaide
+-- Building juceaide
+-- Exporting juceaide
+-- Testing juceaide
+-- Finished setting up juceaide
+-- Scanning for plugins in: /home/dev/projects/music/audio-plugin-coder/plugins
+--  -> FOUND: CloudWash
+-- CloudWash: Building for VST3;Standalone
+-- CloudWash: WebView backend: WebView2
+-- Found WebView2: WebView2_root_dir-NOTFOUND/build/native/include  
+--  -> FOUND: ColourBrickwallScream
+-- ColourBrickwallScream: Building for VST3;Standalone
+-- ColourBrickwallScream: WebView backend: WebView2
+--  -> FOUND: gnarly2
+-- Gnarly2: Building for VST3;Standalone
+-- Gnarly2: WebView backend: WebView2
+--  -> FOUND: gnarly3
+-- Skipping gnarly3: Visage not enabled (set APC_ENABLE_VISAGE=ON to build)
+--  -> FOUND: nf_gnarly
+-- NF Gnarly: Building for VST3;Standalone
+-- NF Gnarly: WebView backend: WebView2
+-- Total plugins found: 5
+-- --- END ---
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/dev/projects/music/audio-plugin-coder/build-mingw-ColourBrickwallScream

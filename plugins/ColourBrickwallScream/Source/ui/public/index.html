@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ColourBrickwallScream</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0D0A09;
+  --panel:     #131010;
+  --raised:    #1C1815;
+  --accent:    #FF3C00;
+  --accent2:   #FF6830;
+  --glow:      rgba(255, 60, 0, 0.35);
+  --glow-deep: rgba(255, 60, 0, 0.12);
+  --text:      #DDD0C8;
+  --dim:       #5A4D48;
+  --label:     #887068;
+  --border:    #2A2220;
+  --sep:       #241E1C;
+}
+
+body {
+  background: var(--bg);
+  width: 700px;
+  height: 500px;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+  position: relative;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
+}
+
+#root { display: flex; flex-direction: column; width: 700px; height: 500px; }
+
+/* ─── HEADER ──────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  height: 62px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--sep);
+  padding: 0 16px;
+  gap: 20px;
+}
+
+#plugin-name-block { flex: 0 0 auto; }
+
+#plugin-name {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+#plugin-sub {
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+#meters-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+}
+
+.meter-row { display: flex; align-items: center; gap: 6px; }
+
+.m-label {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--label);
+  width: 18px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.m-canvas {
+  flex: 1;
+  height: 10px;
+  display: block;
+  border-radius: 1px;
+  background: #0A0806;
+}
+
+.m-val {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  width: 48px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ─── MAIN AREA ───────────────────────────────────────── */
+#main-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.side-section {
+  flex: 0 0 155px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+}
+
+#center-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.knob-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--label);
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1;
+}
+
+.knob-value {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--accent2);
+  text-align: center;
+  min-height: 12px;
+  line-height: 1;
+}
+
+canvas.knob { display: block; cursor: ns-resize; }
+
+/* ─── CHARACTER SELECTOR ─────────────────────────────── */
+#char-sel { display: flex; gap: 4px; margin-top: 4px; }
+
+.char-btn {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  border-radius: 2px;
+  transition: border-color 0.08s, color 0.08s, box-shadow 0.08s;
+  outline: none;
+}
+
+.char-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.char-btn.active {
+  background: var(--glow-deep);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px var(--glow), inset 0 0 6px var(--glow-deep);
+}
+
+/* ─── SEPARATOR ───────────────────────────────────────── */
+.sep { height: 1px; background: var(--sep); flex-shrink: 0; }
+
+/* ─── BOTTOM ROW ──────────────────────────────────────── */
+#bottom-row {
+  height: 131px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--panel);
+  border-top: 1px solid var(--sep);
+  padding: 0 20px;
+}
+
+.small-section { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div id="plugin-name-block">
+      <div id="plugin-name">ColourBrickwall<br>Scream</div>
+      <div id="plugin-sub">Harmonic Saturator &middot; Brickwall Limiter</div>
+    </div>
+    <div id="meters-block">
+      <div class="meter-row">
+        <span class="m-label">IN</span>
+        <canvas class="m-canvas" id="m-in" height="10"></canvas>
+        <span class="m-val" id="mv-in">— dB</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">GR</span>
+        <canvas class="m-canvas" id="m-gr" height="10"></canvas>
+        <span class="m-val" id="mv-gr">— dB</span>
+      </div>
+      <div class="meter-row">
+        <span class="m-label">OUT</span>
+        <canvas class="m-canvas" id="m-out" height="10"></canvas>
+        <span class="m-val" id="mv-out">— dB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div id="main-area">
+    <div class="side-section">
+      <canvas class="knob" id="k-tone" width="100" height="100"
+        data-param="tone" data-norm="0.5"
+        data-min="-1" data-max="1" data-default="0" data-bipolar="1"></canvas>
+      <div class="knob-label">Tone</div>
+      <div class="knob-value" id="v-tone">0.00</div>
+    </div>
+
+    <div id="center-section">
+      <canvas class="knob" id="k-drive" width="180" height="180"
+        data-param="drive" data-norm="0.25"
+        data-min="0" data-max="1" data-default="0.25" data-bipolar="0"></canvas>
+      <div class="knob-label" style="font-size:10px;letter-spacing:3px;">Drive / Scream</div>
+      <div class="knob-value" id="v-drive">10.0 dB</div>
+      <div id="char-sel">
+        <button class="char-btn active" data-char="0">TUBE</button>
+        <button class="char-btn" data-char="1">TAPE</button>
+        <button class="char-btn" data-char="2">XFMR</button>
+        <button class="char-btn" data-char="3">DIODE</button>
+        <button class="char-btn" data-char="4">BITCR</button>
+        <button class="char-btn" data-char="5">SCREAM</button>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <canvas class="knob" id="k-colour" width="100" height="100"
+        data-param="colour" data-norm="0"
+        data-min="0" data-max="1" data-default="0" data-bipolar="0"></canvas>
+      <div class="knob-label">Colour</div>
+      <div class="knob-value" id="v-colour">0%</div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- BOTTOM ROW -->
+  <div id="bottom-row">
+    <div class="small-section">
+      <canvas class="knob" id="k-attack" width="80" height="80"
+        data-param="attack_character" data-norm="0.5"
+        data-min="0" data-max="1" data-default="0.5" data-bipolar="0"></canvas>
+      <div class="knob-label">Attack</div>
+      <div class="knob-value" id="v-attack">4.9 ms</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-ceiling" width="80" height="80"
+        data-param="ceiling" data-norm="0.975"
+        data-min="-12" data-max="0" data-default="-0.3" data-bipolar="0"></canvas>
+      <div class="knob-label">Ceiling</div>
+      <div class="knob-value" id="v-ceiling">-0.3 dBFS</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-mix" width="80" height="80"
+        data-param="mix" data-norm="1"
+        data-min="0" data-max="1" data-default="1" data-bipolar="0"></canvas>
+      <div class="knob-label">Mix</div>
+      <div class="knob-value" id="v-mix">100%</div>
+    </div>
+    <div class="small-section">
+      <canvas class="knob" id="k-output" width="80" height="80"
+        data-param="output_gain" data-norm="0.5"
+        data-min="-12" data-max="12" data-default="0" data-bipolar="1"></canvas>
+      <div class="knob-label">Output</div>
+      <div class="knob-value" id="v-output">0.0 dB</div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="js/index.js"></script>
+</body>
+</html>

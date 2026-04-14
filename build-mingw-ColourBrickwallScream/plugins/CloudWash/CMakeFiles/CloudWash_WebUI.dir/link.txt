@@ -1,0 +1,2 @@
+/usr/bin/x86_64-w64-mingw32-ar qc libCloudWash_WebUI.a CMakeFiles/CloudWash_WebUI.dir/juce_binarydata_CloudWash_WebUI/JuceLibraryCode/BinaryData1.cpp.obj CMakeFiles/CloudWash_WebUI.dir/juce_binarydata_CloudWash_WebUI/JuceLibraryCode/BinaryData2.cpp.obj CMakeFiles/CloudWash_WebUI.dir/juce_binarydata_CloudWash_WebUI/JuceLibraryCode/BinaryData3.cpp.obj CMakeFiles/CloudWash_WebUI.dir/juce_binarydata_CloudWash_WebUI/JuceLibraryCode/BinaryData4.cpp.obj
+/usr/bin/x86_64-w64-mingw32-ranlib libCloudWash_WebUI.a

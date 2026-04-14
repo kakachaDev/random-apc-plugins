@@ -1,0 +1,55 @@
+# --- APC IGNORES ---
+
+# plugin folder
+plugins/AngelGrain
+plugins/gainknob
+plugins/CloudWash/Org_Code
+plugins/XENON
+
+# _tools folder
+_tools/DebugView/
+
+# Design Libraries (examples)
+design_library/_exclude/
+
+# Build Artifacts (The Dirty Zone)
+build/
+cmake-build-*/
+.vs/
+out/
+*.obj
+*.tlog
+*.pdb
+*.idb
+*.exe
+*.vst3
+*.lib
+*.exp
+
+# github
+github/
+
+# User Specific
+PRESS_RELEASE.md
+.vscode/
+*.user
+*.suo
+nul
+
+# plans
+plans/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Logs & Crash Reports
+logs/
+APC_CRASH_REPORT.txt
+build_log.txt
+*_log.txt
+cloudwash_crash_log.txt
+
+# Backups
+_backups/
+dist/

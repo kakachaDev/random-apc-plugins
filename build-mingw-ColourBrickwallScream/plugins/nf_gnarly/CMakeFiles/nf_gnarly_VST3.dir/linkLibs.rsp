@@ -1,0 +1,1 @@
+ nf_gnarly_artefacts/Release/libGnarly_SharedCode.a -lWebView2_root_dir-NOTFOUND/build/native/x64/WebView2LoaderStatic.lib libnf_gnarly_WebUI.a -flto -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 

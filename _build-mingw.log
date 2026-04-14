@@ -1,0 +1,10 @@
+[  0%] Building CXX object plugins/ColourBrickwallScream/CMakeFiles/ColourBrickwallScream_vst3_helper.dir/__/__/_tools/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.obj
+In file included from /home/dev/projects/music/audio-plugin-coder/_tools/JUCE/modules/juce_core/system/juce_CompilerWarnings.h:37,
+                 from /home/dev/projects/music/audio-plugin-coder/_tools/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp:62:
+/home/dev/projects/music/audio-plugin-coder/_tools/JUCE/modules/juce_core/system/juce_TargetPlatform.h:113:6: error: #error "MinGW is not supported. Please use an alternative compiler."
+  113 |     #error "MinGW is not supported. Please use an alternative compiler."
+      |      ^~~~~
+gmake[3]: *** [plugins/ColourBrickwallScream/CMakeFiles/ColourBrickwallScream_vst3_helper.dir/build.make:77: plugins/ColourBrickwallScream/CMakeFiles/ColourBrickwallScream_vst3_helper.dir/__/__/_tools/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.obj] Error 1
+gmake[2]: *** [CMakeFiles/Makefile2:630: plugins/ColourBrickwallScream/CMakeFiles/ColourBrickwallScream_vst3_helper.dir/all] Error 2
+gmake[1]: *** [CMakeFiles/Makefile2:611: plugins/ColourBrickwallScream/CMakeFiles/ColourBrickwallScream_VST3.dir/rule] Error 2
+gmake: *** [Makefile:326: ColourBrickwallScream_VST3] Error 2
