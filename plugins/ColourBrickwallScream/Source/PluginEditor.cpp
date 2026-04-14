@@ -11,11 +11,11 @@ ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEd
     (ColourBrickwallScreamAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    setSize (700, 500);
-
     // ── Create WebBrowserComponent ─────────────────────────────────────────────
     // CRITICAL: Relays must already exist (they are member variables).
     // Pass them via .withOptionsFrom() BEFORE constructing the component.
+    // NOTE: setSize() must be called AFTER addAndMakeVisible so that resized()
+    //       runs with webView already alive and receives correct bounds.
     webView = std::make_unique<juce::WebBrowserComponent> (
         juce::WebBrowserComponent::Options()
 #if JUCE_WINDOWS
@@ -54,6 +54,9 @@ ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEd
 
     // ── Load web content ───────────────────────────────────────────────────────
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+
+    // ── Set editor size LAST so resized() runs with webView already alive ──────
+    setSize (700, 500);
 
     // ── Meter polling timer: ~30fps ────────────────────────────────────────────
     startTimerHz (30);
