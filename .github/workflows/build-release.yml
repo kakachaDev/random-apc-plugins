@@ -60,7 +60,7 @@ jobs:
             echo 'matrix={"plugin":["${{ inputs.plugin }}"]}' >> $GITHUB_OUTPUT
           fi
 
-  # ============================================
+    # ============================================
   # WINDOWS BUILD
   # ============================================
   build-windows:
@@ -80,8 +80,27 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install WebView2 (for plugins that need it)
+        shell: pwsh
+        run: |
+          # Создаем папку для WebView2
+          New-Item -ItemType Directory -Force -Path "$env:TEMP\webview2"
+          
+          # Скачиваем WebView2 SDK через NuGet
+          Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+          Register-PackageSource -ProviderName NuGet -Name nugetRepository -Location https://www.nuget.org/api/v2 -Force
+          
+          # Устанавливаем WebView2 пакет в конкретную папку
+          $package = Install-Package Microsoft.Web.WebView2 -RequiredVersion "1.0.3485.44" -Source nugetRepository -Scope CurrentUser -Force -Destination "$env:TEMP\webview2"
+          
+          # Находим реальный путь к пакету
+          $packagePath = Get-ChildItem -Path "$env:USERPROFILE\.nuget\packages\microsoft.web.webview2" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          echo "WEBVIEW2_PACKAGE_PATH=$($packagePath.FullName)" >> $env:GITHUB_ENV
+
       - name: Configure CMake
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$env:WEBVIEW2_PACKAGE_PATH"
 
       - name: Build VST3
         run: cmake --build build --config Release --target "${{ matrix.plugin }}_VST3"
@@ -96,7 +115,7 @@ jobs:
           find build -name "*.vst3" -exec cp -R {} dist/ \;
           find build -name "*.exe" -not -path "*/CMakeFiles/*" -exec cp {} dist/ \;
           echo "Collected:" && ls dist/
-
+          
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
