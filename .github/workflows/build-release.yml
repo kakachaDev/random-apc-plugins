@@ -83,7 +83,6 @@ jobs:
       - name: Install WebView2 (direct download)
         shell: pwsh
         run: |
-          # Скачиваем WebView2 SDK напрямую с nuget.org
           $webview2Url = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.3485.44"
           $zipPath = "$env:TEMP\webview2.zip"
           $extractPath = "$env:TEMP\webview2"
@@ -93,19 +92,27 @@ jobs:
           
           Write-Host "Extracting..."
           Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
-          
-          # Удаляем zip файл
           Remove-Item $zipPath -Force
           
-          # Сохраняем путь для CMake
+          # Сохраняем путь в переменную окружения (правильный синтаксис для GitHub Actions)
           echo "WEBVIEW2_PACKAGE_PATH=$extractPath" >> $env:GITHUB_ENV
           
-          Write-Host "WebView2 installed to: $extractPath"
+          # Также создаем переменную для CMake через setx (на всякий случай)
+          Write-Host "Setting environment variable for CMake..."
+          echo "JUCE_WEBVIEW2_PACKAGE_LOCATION=$extractPath" >> $env:GITHUB_ENV
 
       - name: Configure CMake
+        shell: pwsh
         run: |
+          # Проверяем, что путь существует
+          Write-Host "WEBVIEW2_PACKAGE_PATH: $env:WEBVIEW2_PACKAGE_PATH"
+          Write-Host "Contents of webview2 folder:"
+          Get-ChildItem "$env:WEBVIEW2_PACKAGE_PATH" -Recurse | Select-Object -First 20
+          
+          # Конфигурируем с явным указанием пути
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
-            -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$env:WEBVIEW2_PACKAGE_PATH"
+            -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$env:WEBVIEW2_PACKAGE_PATH" `
+            -DJUCE_WEBVIEW2_FORCE_OFF=OFF
 
       - name: Build VST3
         run: cmake --build build --config Release --target "${{ matrix.plugin }}_VST3"
