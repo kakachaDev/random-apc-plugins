@@ -80,39 +80,36 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install WebView2 (direct download)
+      - name: Install WebView2 SDK
         shell: pwsh
         run: |
-          $webview2Url = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.3485.44"
-          $zipPath = "$env:TEMP\webview2.zip"
-          $extractPath = "$env:TEMP\webview2"
-          
-          Write-Host "Downloading WebView2 SDK..."
-          Invoke-WebRequest -Uri $webview2Url -OutFile $zipPath -UseBasicParsing
-          
-          Write-Host "Extracting..."
-          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $version    = "1.0.3485.44"
+          $url        = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/$version"
+          $zipPath    = "$env:TEMP\webview2.zip"
+          # JUCE FindWebView2.cmake globs for *Microsoft.Web.WebView2* subdirs
+          # inside JUCE_WEBVIEW2_PACKAGE_LOCATION, so the package must live in
+          # a named subdirectory, not extracted flat into the root.
+          $nugetDir   = "$env:TEMP\nuget_packages"
+          $pkgDir     = "$nugetDir\Microsoft.Web.WebView2.$version"
+
+          Write-Host "Downloading WebView2 $version..."
+          Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+
+          Write-Host "Extracting to $pkgDir ..."
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          Expand-Archive -Path $zipPath -DestinationPath $pkgDir -Force
           Remove-Item $zipPath -Force
-          
-          # Сохраняем путь в переменную окружения (правильный синтаксис для GitHub Actions)
-          echo "WEBVIEW2_PACKAGE_PATH=$extractPath" >> $env:GITHUB_ENV
-          
-          # Также создаем переменную для CMake через setx (на всякий случай)
-          Write-Host "Setting environment variable for CMake..."
-          echo "JUCE_WEBVIEW2_PACKAGE_LOCATION=$extractPath" >> $env:GITHUB_ENV
+
+          Write-Host "Package contents:"
+          Get-ChildItem $pkgDir -Recurse | Select-Object -First 20
+
+          echo "JUCE_WEBVIEW2_PACKAGE_LOCATION=$nugetDir" >> $env:GITHUB_ENV
 
       - name: Configure CMake
         shell: pwsh
         run: |
-          # Проверяем, что путь существует
-          Write-Host "WEBVIEW2_PACKAGE_PATH: $env:WEBVIEW2_PACKAGE_PATH"
-          Write-Host "Contents of webview2 folder:"
-          Get-ChildItem "$env:WEBVIEW2_PACKAGE_PATH" -Recurse | Select-Object -First 20
-          
-          # Конфигурируем с явным указанием пути
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
-            -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$env:WEBVIEW2_PACKAGE_PATH" `
-            -DJUCE_WEBVIEW2_FORCE_OFF=OFF
+            -DJUCE_WEBVIEW2_PACKAGE_LOCATION="$env:JUCE_WEBVIEW2_PACKAGE_LOCATION"
 
       - name: Build VST3
         run: cmake --build build --config Release --target "${{ matrix.plugin }}_VST3"

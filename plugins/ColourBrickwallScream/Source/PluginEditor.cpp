@@ -112,7 +112,7 @@ juce::ZipFile* ColourBrickwallScreamAudioProcessorEditor::getZipFile()
     if (stream == nullptr)
         return nullptr;
 
-    static juce::ZipFile f { stream.get(), false };
+    static juce::ZipFile f { *stream };
     return &f;
 }
 
