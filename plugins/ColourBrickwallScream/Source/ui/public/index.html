@@ -6,6 +6,13 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0D0A09;
+}
+
 :root {
   --bg:        #0D0A09;
   --panel:     #131010;
@@ -23,20 +30,21 @@
 
 body {
   background: var(--bg);
-  width: 700px;
-  height: 500px;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
   font-family: 'Courier New', Courier, monospace;
   color: var(--text);
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
-  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-body::after {
+#root::after {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 999;
@@ -45,7 +53,14 @@ body::after {
   background-size: 300px 300px;
 }
 
-#root { display: flex; flex-direction: column; width: 700px; height: 500px; }
+#root {
+  display: flex;
+  flex-direction: column;
+  width: 700px;
+  height: 500px;
+  transform-origin: top left;
+  flex-shrink: 0;
+}
 
 /* ─── HEADER ──────────────────────────────────────────── */
 #header {

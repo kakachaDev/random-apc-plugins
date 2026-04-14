@@ -55,6 +55,11 @@ ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEd
     // ── Load web content ───────────────────────────────────────────────────────
     webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
 
+    // ── Resizability ───────────────────────────────────────────────────────────
+    setResizable (true, true);
+    setResizeLimits (350, 250, 1400, 1000);
+    getConstrainer()->setFixedAspectRatio (700.0 / 500.0);
+
     // ── Set editor size LAST so resized() runs with webView already alive ──────
     setSize (700, 500);
 

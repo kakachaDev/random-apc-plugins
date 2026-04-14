@@ -330,7 +330,26 @@ window.__juceMeterUpdate = function (data) {
 // INIT
 // ═══════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════
+// SCALE TO WINDOW
+// ═══════════════════════════════════════════════════════
+
+const DESIGN_W = 700;
+
+function applyScale () {
+  const scale = window.innerWidth / DESIGN_W;   // aspect is locked by C++, so W is enough
+  const root  = document.getElementById('root');
+  if (root) root.style.transform = `scale(${scale})`;
+}
+
+window.addEventListener('resize', applyScale);
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+
 document.addEventListener('DOMContentLoaded', () => {
+  applyScale();
   resizeMeters();
   initKnobs();
   initCharSelector();
