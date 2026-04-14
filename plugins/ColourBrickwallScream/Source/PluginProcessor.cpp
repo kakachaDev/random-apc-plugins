@@ -248,27 +248,35 @@ void ColourBrickwallScreamAudioProcessor::ColourFilter::setCoeffs (BiquadCoeffs:
 
 void ColourBrickwallScreamAudioProcessor::updateColourFilter (int variant, double sr)
 {
+    // IMPORTANT: JUCE IIR shelf/peak functions expect a LINEAR gain factor, not dB.
+    // Pass juce::Decibels::decibelsToGain(dBvalue) — never raw dB numbers.
     BiquadCoeffs::Ptr c;
 
     switch (variant)
     {
-        case 0:  // Tube: fat low-mid warmth (+14dB at 250Hz, Q=0.5)
-            c = BiquadCoeffs::makePeakFilter (sr, 250.0, 0.5, 14.0f);
+        case 0:  // Tube: fat low-mid warmth (+12dB at 250Hz, Q=0.5)
+            c = BiquadCoeffs::makePeakFilter (sr, 250.0, 0.5,
+                    juce::Decibels::decibelsToGain (12.0f));
             break;
-        case 1:  // Tape: presence + air (+14dB high shelf at 3.5kHz)
-            c = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7, 14.0f);
+        case 1:  // Tape: presence + air (+12dB high shelf at 3.5kHz)
+            c = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7,
+                    static_cast<double> (juce::Decibels::decibelsToGain (12.0f)));
             break;
-        case 2:  // Transformer: aggressive mid honk (+15dB at 1.5kHz, Q=2.5)
-            c = BiquadCoeffs::makePeakFilter (sr, 1500.0, 2.5, 15.0f);
+        case 2:  // Transformer: aggressive mid honk (+14dB at 1.5kHz, Q=2.5)
+            c = BiquadCoeffs::makePeakFilter (sr, 1500.0, 2.5,
+                    juce::Decibels::decibelsToGain (14.0f));
             break;
-        case 3:  // Diode: sibilant bite (+15dB at 5kHz, Q=3.0)
-            c = BiquadCoeffs::makePeakFilter (sr, 5000.0, 3.0, 15.0f);
+        case 3:  // Diode: sibilant bite (+14dB at 5kHz, Q=3.0)
+            c = BiquadCoeffs::makePeakFilter (sr, 5000.0, 3.0,
+                    juce::Decibels::decibelsToGain (14.0f));
             break;
-        case 4:  // Bitcrush: harsh presence (+15dB at 10kHz, Q=4.0)
-            c = BiquadCoeffs::makePeakFilter (sr, 10000.0, 4.0, 15.0f);
+        case 4:  // Bitcrush: harsh presence (+14dB at 10kHz, Q=4.0)
+            c = BiquadCoeffs::makePeakFilter (sr, 10000.0, 4.0,
+                    juce::Decibels::decibelsToGain (14.0f));
             break;
-        case 5:  // Full Scream: subharmonic rumble (+16dB low shelf at 100Hz)
-            c = BiquadCoeffs::makeLowShelf (sr, 100.0, 0.5, 16.0f);
+        case 5:  // Full Scream: subharmonic rumble (+14dB low shelf at 100Hz)
+            c = BiquadCoeffs::makeLowShelf (sr, 100.0, 0.5,
+                    static_cast<double> (juce::Decibels::decibelsToGain (14.0f)));
             break;
         default:
             c = BiquadCoeffs::makeAllPass (sr, 1000.0, 0.7);
@@ -288,11 +296,17 @@ void ColourBrickwallScreamAudioProcessor::updateToneFilter (float toneValue, dou
 {
     lastToneValue = toneValue;
 
-    const float gainHigh = toneValue * 9.0f;   // ±9dB high shelf
-    const float gainLow  = -toneValue * 6.0f;  // ±6dB low shelf (opposite polarity)
+    // JUCE shelf functions expect LINEAR gain factor, not dB.
+    // At toneValue=0: decibelsToGain(0) = 1.0 → identity (transparent).
+    // Positive tone → brighter (high shelf +9dB, low shelf −6dB).
+    // Negative tone → warmer (high shelf −9dB, low shelf +6dB).
+    const float gainHighDb = toneValue * 9.0f;    // ±9dB
+    const float gainLowDb  = -toneValue * 6.0f;   // ∓6dB
 
-    auto cHigh = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7, static_cast<double> (gainHigh));
-    auto cLow  = BiquadCoeffs::makeLowShelf  (sr, 250.0,  0.7, static_cast<double> (gainLow));
+    auto cHigh = BiquadCoeffs::makeHighShelf (sr, 3500.0, 0.7,
+                    static_cast<double> (juce::Decibels::decibelsToGain (gainHighDb)));
+    auto cLow  = BiquadCoeffs::makeLowShelf  (sr, 250.0,  0.7,
+                    static_cast<double> (juce::Decibels::decibelsToGain (gainLowDb)));
 
     for (int ch = 0; ch < numChannels_; ++ch)
     {
