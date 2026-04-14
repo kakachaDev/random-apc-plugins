@@ -504,8 +504,8 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
         // 4x oversampled peak detection
         // We'll do detection on the non-oversampled signal for simplicity
         // (true-peak detection via oversampler happens on the write path)
-        auto& oversampledBlock = oversampler.processSamplesUp (
-            juce::dsp::AudioBlock<float> (buffer));
+        juce::dsp::AudioBlock<float> inputBlock (buffer);
+        auto& oversampledBlock = oversampler.processSamplesUp (inputBlock);
 
         const int osNumSamples = static_cast<int> (oversampledBlock.getNumSamples());
         float peakOS = 0.0f;
@@ -513,7 +513,8 @@ void ColourBrickwallScreamAudioProcessor::processBlock (juce::AudioBuffer<float>
             for (int i = 0; i < osNumSamples; ++i)
                 peakOS = std::max (peakOS, std::abs (oversampledBlock.getSample (ch, i)));
 
-        oversampler.processSamplesDown (juce::dsp::AudioBlock<float> (buffer));
+        juce::dsp::AudioBlock<float> outputBlock (buffer);
+        oversampler.processSamplesDown (outputBlock);
 
         // Write current samples to lookahead buffer
         for (int ch = 0; ch < numCh; ++ch)
