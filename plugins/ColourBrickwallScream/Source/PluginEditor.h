@@ -62,10 +62,8 @@ private:
     // Resource provider
     // ═══════════════════════════════════════════════════════════════════════════
     std::optional<juce::WebBrowserComponent::Resource> getResource (const juce::String& url);
-    static juce::ZipFile*    getZipFile();
-    static const char*       getMimeForExtension (const juce::String& extension);
-    static juce::String      getExtension (juce::String filename);
-    static auto              streamToVector (juce::InputStream& stream);
+    static const char*  getMimeForExtension (const juce::String& extension);
+    static juce::String getExtension (juce::String filename);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ColourBrickwallScreamAudioProcessorEditor)
 };

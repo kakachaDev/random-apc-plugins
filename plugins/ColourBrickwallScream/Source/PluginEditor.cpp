@@ -2,7 +2,9 @@
 #include "PluginEditor.h"
 #include "ParameterIDs.hpp"
 
+#include <BinaryData.h>
 #include <unordered_map>
+#include <cstring>
 
 //==============================================================================
 ColourBrickwallScreamAudioProcessorEditor::ColourBrickwallScreamAudioProcessorEditor
@@ -104,17 +106,12 @@ void ColourBrickwallScreamAudioProcessorEditor::timerCallback()
 //==============================================================================
 // RESOURCE PROVIDER
 //==============================================================================
-juce::ZipFile* ColourBrickwallScreamAudioProcessorEditor::getZipFile()
-{
-    static auto stream = juce::createAssetInputStream (
-        "colourbrickwallscream_webui.zip", juce::AssertAssetExists::no);
-
-    if (stream == nullptr)
-        return nullptr;
-
-    static juce::ZipFile f { *stream };
-    return &f;
-}
+// BinaryData variable names follow juce_add_binary_data rules:
+//   filename.ext → filename_ext  (. and space → _)
+//   duplicate basenames get suffix 2, 3, …  (order matches CMakeLists SOURCES)
+//   CMakeLists order: index.html, js/index.js, js/juce/index.js,
+//                     js/juce/check_native_interop.js
+//   → index_html, index_js, index_js2, check_native_interop_js
 
 const char* ColourBrickwallScreamAudioProcessorEditor::getMimeForExtension (const juce::String& extension)
 {
@@ -145,30 +142,31 @@ juce::String ColourBrickwallScreamAudioProcessorEditor::getExtension (juce::Stri
     return filename.fromLastOccurrenceOf (".", false, false);
 }
 
-auto ColourBrickwallScreamAudioProcessorEditor::streamToVector (juce::InputStream& stream)
-{
-    std::vector<std::byte> result (static_cast<size_t> (stream.getTotalLength()));
-    stream.setPosition (0);
-    [[maybe_unused]] const auto bytesRead = stream.read (result.data(), result.size());
-    jassert (bytesRead == static_cast<ssize_t> (result.size()));
-    return result;
-}
-
 std::optional<juce::WebBrowserComponent::Resource>
 ColourBrickwallScreamAudioProcessorEditor::getResource (const juce::String& url)
 {
-    const auto urlToRetrieve = (url == "/" || url.isEmpty())
+    const auto path = (url == "/" || url.isEmpty())
         ? juce::String { "index.html" }
         : url.fromFirstOccurrenceOf ("/", false, false);
 
-    if (auto* archive = getZipFile())
+    struct Asset { const char* urlPath; const char* data; int size; };
+
+    static const Asset assets[] =
     {
-        if (auto* entry = archive->getEntry (urlToRetrieve))
+        { "index.html",                      BinaryData::index_html,              BinaryData::index_htmlSize              },
+        { "js/index.js",                     BinaryData::index_js,                BinaryData::index_jsSize                },
+        { "js/juce/index.js",                BinaryData::index_js2,               BinaryData::index_js2Size               },
+        { "js/juce/check_native_interop.js", BinaryData::check_native_interop_js, BinaryData::check_native_interop_jsSize },
+    };
+
+    for (const auto& asset : assets)
+    {
+        if (path == asset.urlPath)
         {
-            auto stream = juce::rawToUniquePtr (archive->createStreamForEntry (*entry));
-            auto data   = streamToVector (*stream);
-            auto mime   = getMimeForExtension (getExtension (entry->filename).toLowerCase());
-            return juce::WebBrowserComponent::Resource { std::move (data), juce::String { mime } };
+            std::vector<std::byte> data (static_cast<size_t> (asset.size));
+            std::memcpy (data.data(), asset.data, static_cast<size_t> (asset.size));
+            return juce::WebBrowserComponent::Resource { std::move (data),
+                                                         juce::String { getMimeForExtension (getExtension (path)) } };
         }
     }
 
