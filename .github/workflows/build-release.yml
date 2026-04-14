@@ -80,22 +80,27 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install WebView2 (for plugins that need it)
+      - name: Install WebView2 (direct download)
         shell: pwsh
         run: |
-          # Создаем папку для WebView2
-          New-Item -ItemType Directory -Force -Path "$env:TEMP\webview2"
+          # Скачиваем WebView2 SDK напрямую с nuget.org
+          $webview2Url = "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.3485.44"
+          $zipPath = "$env:TEMP\webview2.zip"
+          $extractPath = "$env:TEMP\webview2"
           
-          # Скачиваем WebView2 SDK через NuGet
-          Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
-          Register-PackageSource -ProviderName NuGet -Name nugetRepository -Location https://www.nuget.org/api/v2 -Force
+          Write-Host "Downloading WebView2 SDK..."
+          Invoke-WebRequest -Uri $webview2Url -OutFile $zipPath -UseBasicParsing
           
-          # Устанавливаем WebView2 пакет в конкретную папку
-          $package = Install-Package Microsoft.Web.WebView2 -RequiredVersion "1.0.3485.44" -Source nugetRepository -Scope CurrentUser -Force -Destination "$env:TEMP\webview2"
+          Write-Host "Extracting..."
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
           
-          # Находим реальный путь к пакету
-          $packagePath = Get-ChildItem -Path "$env:USERPROFILE\.nuget\packages\microsoft.web.webview2" -Directory | Sort-Object Name -Descending | Select-Object -First 1
-          echo "WEBVIEW2_PACKAGE_PATH=$($packagePath.FullName)" >> $env:GITHUB_ENV
+          # Удаляем zip файл
+          Remove-Item $zipPath -Force
+          
+          # Сохраняем путь для CMake
+          echo "WEBVIEW2_PACKAGE_PATH=$extractPath" >> $env:GITHUB_ENV
+          
+          Write-Host "WebView2 installed to: $extractPath"
 
       - name: Configure CMake
         run: |
